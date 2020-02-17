@@ -17,15 +17,28 @@ type site struct {
 	Floor   float64  `json:"floor"`
 }
 
+func (site *site) canBid(bidder string) bool {
+	return contains(bidder, site.Bidders)
+}
+
 type bidder struct {
 	Name       string  `json:"name"`
 	Adjustment float64 `json:"adjustment"`
 }
 
+func (bidder *bidder) adjustedBid(bid float64) float64 {
+	return bidder.Adjustment*bid + bid
+}
+
 type auction struct {
-	Site  string   `json:"site"`
-	Units []string `json:"units"`
-	Bids  []bid    `json:"bids"`
+	Site     string   `json:"site"`
+	Units    []string `json:"units"`
+	Bids     []bid    `json:"bids"`
+	SiteInfo *site
+}
+
+func (auction *auction) isRegisteredUnit(unit string) bool {
+	return contains(unit, auction.Units)
 }
 
 type bid struct {
@@ -33,6 +46,7 @@ type bid struct {
 	Unit          string  `json:"unit"`
 	Bid           float64 `json:"bid"`
 	AdjustedValue float64 `json:"-"`
+	BidderInfo    *bidder `json:"-"`
 }
 
 type siteData struct {
@@ -40,21 +54,18 @@ type siteData struct {
 	Floor   float64
 }
 
-func mapBidders(bidders []bidder) map[string]float64 {
-	bidderMap := make(map[string]float64)
+func mapBidders(bidders []bidder) map[string]bidder {
+	bidderMap := make(map[string]bidder)
 	for _, bidder := range bidders {
-		bidderMap[bidder.Name] = bidder.Adjustment
+		bidderMap[bidder.Name] = bidder
 	}
 	return bidderMap
 }
 
-func mapSiteInfo(sites []site) map[string]siteData {
-	siteMap := make(map[string]siteData)
+func mapSiteInfo(sites []site) map[string]site {
+	siteMap := make(map[string]site)
 	for _, site := range sites {
-		siteMap[site.Name] = siteData{
-			Bidders: site.Bidders,
-			Floor:   site.Floor,
-		}
+		siteMap[site.Name] = site
 	}
 	return siteMap
 }
@@ -68,47 +79,43 @@ func contains(value string, list []string) bool {
 	return false
 }
 
-func validBidsPerUnit(auction auction, bidderMap map[string]float64, siteData siteData) map[string][]bid {
-	mapUnitsToBids := make(map[string][]bid)
-	for _, bid := range auction.Bids {
-		// Check if unit appears on the site
-		if ok := contains(bid.Unit, auction.Units); ok {
-			// Check if bidder is known
-			if adjustment, ok := bidderMap[bid.Bidder]; ok {
-				// Check if bidder is permitted to bid on the site
-				if ok := contains(bid.Bidder, siteData.Bidders); ok {
-					// Check if adjusted value is greater or equal to floor
-					adjustedValue := adjustment*bid.Bid + bid.Bid
-					if adjustedValue >= siteData.Floor {
-						bid.AdjustedValue = adjustedValue
-						mapUnitsToBids[bid.Unit] = append(mapUnitsToBids[bid.Unit], bid)
-					}
-				}
+func (bid *bid) isValid(auction *auction) bool {
+	// Check if unit appears on the site
+	if auction.isRegisteredUnit(bid.Unit) {
+		// Check if bidder is permitted to bid on the site
+		if auction.SiteInfo.canBid(bid.Bidder) {
+			// Check if adjusted value is greater or equal to floor
+			bid.AdjustedValue = bid.BidderInfo.adjustedBid(bid.Bid)
+			if bid.AdjustedValue >= auction.SiteInfo.Floor {
+				return true
 			}
 		}
-
 	}
-	return mapUnitsToBids
+	return false
 }
 
-func maxBidsPerSite(mapUnitsToBids map[string][]bid, units []string) []bid {
-	var winnerBids []bid
-	for _, unit := range units {
-		var maxVal float64
-		var winnerBid bid
-		if validBidsForSite, ok := mapUnitsToBids[unit]; ok {
-			for _, validBid := range validBidsForSite {
-				if validBid.AdjustedValue >= maxVal {
-					maxVal = validBid.AdjustedValue
-					winnerBid = validBid
+func (auction *auction) findWinners(bidderMap map[string]bidder) []bid {
+	winnersPerUnit := make(map[string]bid)
+	winners := []bid{}
+	for _, bid := range auction.Bids {
+		// Attach bidder to bid if it exists; if it doesn't exist, ignore the bid
+		if bidder, ok := bidderMap[bid.Bidder]; ok {
+			bid.BidderInfo = &bidder
+			// Check if bid is valid
+			if bid.isValid(auction) {
+				currentWinner := winnersPerUnit[bid.Unit]
+				if bid.AdjustedValue > currentWinner.Bid {
+					winnersPerUnit[bid.Unit] = bid
 				}
 			}
 		}
-		if maxVal != 0 {
-			winnerBids = append(winnerBids, winnerBid)
+	}
+	for _, winningBid := range winnersPerUnit {
+		if winningBid.Bid > 0 {
+			winners = append(winners, winningBid)
 		}
 	}
-	return winnerBids
+	return winners
 }
 
 func main() {
@@ -141,9 +148,11 @@ func main() {
 	var solution [][]bid
 	for _, auction := range auctions {
 		if siteData, ok := siteMap[auction.Site]; ok {
-			validBidsPerUnit := validBidsPerUnit(auction, bidderMap, siteData)
-			maxBidsPerSite := maxBidsPerSite(validBidsPerUnit, auction.Units)
-			solution = append(solution, maxBidsPerSite)
+			auction.SiteInfo = &siteData
+			winners := auction.findWinners(bidderMap)
+			solution = append(solution, winners)
+		} else {
+			solution = append(solution, []bid{})
 		}
 	}
 
