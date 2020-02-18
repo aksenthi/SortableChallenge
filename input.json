@@ -19,5 +19,32 @@
                 "bid": 55
             }
         ]
+    },
+    {
+        "site": "abc.com",
+        "units": ["banner", "sidebar"],
+        "bids": [
+            {
+                "bidder": "AUCT",
+                "unit": "banner",
+                "bid": 35
+            },
+            {
+                "bidder": "AUCT",
+                "unit": "banner",
+                "bid": 67
+            },
+            {
+                "bidder": "BIDD",
+                "unit": "sidebar",
+                "bid": 60
+            },
+            {
+                "bidder": "LOV",
+                "unit": "sidebar",
+                "bid": 60
+            }
+
+        ]
     }
 ]
