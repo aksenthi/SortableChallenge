@@ -18,6 +18,7 @@ type site struct {
 	Floor   float64  `json:"floor"`
 }
 
+// Check if bidder can bid on the site
 func (site *site) canBid(bidder string) bool {
 	return contains(bidder, site.Bidders)
 }
@@ -27,6 +28,7 @@ type bidder struct {
 	Adjustment float64 `json:"adjustment"`
 }
 
+// Compute adjusted bid
 func (bidder *bidder) adjustedBid(bid float64) float64 {
 	return bidder.Adjustment*bid + bid
 }
@@ -38,6 +40,7 @@ type auction struct {
 	Site     *site
 }
 
+// Check if unit appears on the site
 func (auction *auction) isRegisteredUnit(unit string) bool {
 	return contains(unit, auction.Units)
 }
@@ -48,6 +51,7 @@ type bid struct {
 	Bid    float64 `json:"bid"`
 }
 
+// Create an index of Bidders and their information
 func createBidderIndex(bidders []bidder) map[string]*bidder {
 	bidderIndex := make(map[string]*bidder)
 	for i, bidder := range bidders {
@@ -57,6 +61,7 @@ func createBidderIndex(bidders []bidder) map[string]*bidder {
 	return bidderIndex
 }
 
+// Create an index of Sites and their information
 func createSiteIndex(sites []site) map[string]*site {
 	siteIndex := make(map[string]*site)
 	for i, site := range sites {
@@ -74,11 +79,14 @@ func contains(value string, list []string) bool {
 	return false
 }
 
+
+// Check validity of the bid
 func (auction *auction) isValid(bid *bid) bool {
 	// Check if unit appears on the site and if bidder is permitted to bid on the site
 	return auction.isRegisteredUnit(bid.Unit) && auction.Site.canBid(bid.Bidder)
 }
 
+// Find winners of the auction
 func (auction *auction) findWinners(bidderIndex map[string]*bidder) []bid {
 	winnersPerUnit := make(map[string]bid)
 	winningBidsPerUnit := make(map[string]float64)
