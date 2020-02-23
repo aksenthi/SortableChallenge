@@ -1,6 +1,5 @@
-FROM golang:onbuild
+FROM golang:1.12.3
 
-RUN mkdir /app
-ADD . /app/
-RUN go build -o auction .
-CMD ["/app/auction"]
+COPY auction.go .
+RUN go build auction.go
+CMD ./auction
